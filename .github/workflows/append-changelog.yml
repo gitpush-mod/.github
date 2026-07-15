@@ -42,7 +42,12 @@ jobs:
       - name: Check out caller repo
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.MOD_PROJECT_TOKEN }}
+          # Prefer MOD_PROJECT_TOKEN when the caller has it (gitpush-mod repos
+          # inherit it via secrets: inherit). Fall back to the caller's default
+          # GITHUB_TOKEN (which has contents: write via the permissions block
+          # above) for repos that don't have the org secret — e.g. Godimas101
+          # personal repos also using this reusable workflow.
+          token: ${{ secrets.MOD_PROJECT_TOKEN || github.token }}
 
       - name: Append to CHANGELOG.md
         env:
