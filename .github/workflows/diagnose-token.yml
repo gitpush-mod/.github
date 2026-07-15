@@ -1,9 +1,7 @@
 name: Diagnose MOD_PROJECT_TOKEN
 
 # Manual-only diagnostic. Confirms whether the stored MOD_PROJECT_TOKEN can
-# authenticate to GitHub, what scopes it has, and whether it can read the org
-# projects. Removes any need to guess about token corruption / scope issues.
-#
+# authenticate to GitHub and reach both org + user projects.
 # Delete this workflow file after the token is confirmed working.
 
 on:
@@ -13,61 +11,33 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: 1) Basic auth check + report scopes
+      - name: Probe token reach
         env:
           TOKEN: ${{ secrets.MOD_PROJECT_TOKEN }}
         run: |
           set -uo pipefail
-          if [[ -z "${TOKEN:-}" ]]; then
-            echo "::error::TOKEN is empty — secret is not present or has an empty value"
-            exit 1
-          fi
 
-          LEN=${#TOKEN}
-          echo "Token length (chars): $LEN"
-
-          FIRST=$(printf '%s' "$TOKEN" | head -c 12)
-          echo "Token prefix (first 12 chars): $FIRST"
-
-          # Detect trailing whitespace/newline in the stored secret
-          TRIMMED=$(printf '%s' "$TOKEN" | tr -d '[:space:]')
-          if [[ ${#TRIMMED} -ne $LEN ]]; then
-            echo "::warning::Token contains whitespace/newline characters ($((LEN - ${#TRIMMED})) extras). Likely pasted with a trailing newline."
-          else
-            echo "No stray whitespace detected."
-          fi
-
-          # Classic PAT starts with ghp_, fine-grained with github_pat_, GH Actions with ghs_
-          case "$FIRST" in
-            ghp_*)         echo "Type: Classic PAT (ghp_)" ;;
-            github_pat_*)  echo "Type: Fine-grained PAT (github_pat_)" ;;
-            ghs_*)         echo "Type: GitHub Actions token (ghs_)" ;;
-            gho_*)         echo "Type: OAuth token (gho_)" ;;
-            *)             echo "::warning::Type: unknown prefix — may be corrupted" ;;
-          esac
-
-          echo
-          echo "--- 2) /user endpoint (auth check) ---"
-          RESP=$(curl -sS -o /tmp/user_body.json -w "HTTP %{http_code}" \
-            -H "Authorization: Bearer $TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            https://api.github.com/user)
-          echo "$RESP"
-          head -c 500 /tmp/user_body.json; echo
-
-          echo
-          echo "--- 3) HTTP response header: X-OAuth-Scopes (classic PAT only) ---"
-          curl -sS -D - -o /dev/null \
-            -H "Authorization: Bearer $TOKEN" \
-            https://api.github.com/user | grep -iE '^x-oauth-scopes|^x-accepted-oauth-scopes' || echo "  (no scope headers — likely fine-grained PAT)"
-
-          echo
-          echo "--- 4) Org projects read via GraphQL ---"
+          echo "--- Org project (gitpush-mod projects/3) ---"
           BODY='{"query":"{ organization(login: \"gitpush-mod\") { projectV2(number: 3) { id title } } }"}'
-          curl -sS -o /tmp/gql_body.json -w "HTTP %{http_code}\n" \
+          curl -sS -o /tmp/gql1.json -w "HTTP %{http_code}\n" \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/json" \
             -X POST -d "$BODY" \
             https://api.github.com/graphql
-          cat /tmp/gql_body.json; echo
+          cat /tmp/gql1.json; echo
+
+          echo "--- User project (Godimas101 projects/2, Personal Projects) ---"
+          BODY='{"query":"{ user(login: \"Godimas101\") { projectV2(number: 2) { id title } } }"}'
+          curl -sS -o /tmp/gql2.json -w "HTTP %{http_code}\n" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -X POST -d "$BODY" \
+            https://api.github.com/graphql
+          cat /tmp/gql2.json; echo
+
+          echo "--- Repo contents write test (dry) ---"
+          # Just check that we can read a mod repo — write is implied if read of restricted metadata works
+          curl -sS -o /tmp/rc.json -w "HTTP %{http_code}\n" \
+            -H "Authorization: Bearer $TOKEN" \
+            https://api.github.com/repos/gitpush-mod/se-infolcd-apex-update/contents/README.md
+          head -c 200 /tmp/rc.json; echo
