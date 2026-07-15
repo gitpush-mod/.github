@@ -1,0 +1,156 @@
+name: Auto-archive old Done items on mod boards
+
+on:
+  schedule:
+    - cron: '0 5 * * 0'  # Sunday 05:00 UTC
+  workflow_dispatch:
+    inputs:
+      days_old:
+        description: 'Days after which Done items are archived'
+        required: false
+        default: '30'
+      dry_run:
+        description: 'Dry run (no writes)'
+        required: false
+        default: 'false'
+        type: choice
+        options: ['false', 'true']
+
+permissions:
+  contents: read
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    env:
+      ORG: gitpush-mod
+      DAYS_OLD: ${{ inputs.days_old || '30' }}
+      DRY_RUN: ${{ inputs.dry_run || 'false' }}
+      GH_TOKEN: ${{ secrets.MOD_PROJECT_TOKEN }}
+    steps:
+      - name: Archive Done items older than ${{ inputs.days_old || '30' }} days
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${GH_TOKEN:-}" ]]; then
+            echo "::error::MOD_PROJECT_TOKEN secret is not set on this repo/org."
+            exit 1
+          fi
+
+          BOARDS="3 4 5 6 7 8 9 10 11 12"
+          TOTAL=0
+          THRESHOLD=$(date -u -d "$DAYS_OLD days ago" +%s)
+          echo "Threshold: $DAYS_OLD days → cutoff $(date -u -d "@$THRESHOLD" '+%Y-%m-%d %H:%M UTC')"
+          echo "Dry run: $DRY_RUN"
+          echo
+
+          for NUM in $BOARDS; do
+            echo "==> Board /$NUM"
+
+            META=$(gh api graphql -f query='
+              query($org: String!, $num: Int!) {
+                organization(login: $org) {
+                  projectV2(number: $num) {
+                    id
+                    title
+                    field(name: "Status") {
+                      ... on ProjectV2SingleSelectField {
+                        id
+                        options { id name }
+                      }
+                    }
+                  }
+                }
+              }' -f org="$ORG" -F num=$NUM)
+
+            PROJECT_ID=$(echo "$META" | jq -r '.data.organization.projectV2.id // empty')
+            TITLE=$(echo "$META" | jq -r '.data.organization.projectV2.title // "?"')
+            FIELD_ID=$(echo "$META" | jq -r '.data.organization.projectV2.field.id // empty')
+            DONE_ID=$(echo "$META" | jq -r '.data.organization.projectV2.field.options[]? | select(.name=="Done") | .id')
+            ARCHIVED_ID=$(echo "$META" | jq -r '.data.organization.projectV2.field.options[]? | select(.name=="Archived") | .id')
+
+            if [[ -z "$PROJECT_ID" || -z "$FIELD_ID" || -z "$DONE_ID" || -z "$ARCHIVED_ID" ]]; then
+              echo "  ✗ missing IDs (board=$NUM title=$TITLE) — skip"
+              continue
+            fi
+            echo "  [$TITLE] project=$PROJECT_ID"
+
+            CURSOR=""
+            BOARD_COUNT=0
+            while :; do
+              if [[ -z "$CURSOR" ]]; then
+                RESULT=$(gh api graphql -f query='
+                  query($id: ID!) {
+                    node(id: $id) {
+                      ... on ProjectV2 {
+                        items(first: 100) {
+                          pageInfo { hasNextPage endCursor }
+                          nodes {
+                            id
+                            updatedAt
+                            fieldValueByName(name: "Status") {
+                              ... on ProjectV2ItemFieldSingleSelectValue { optionId }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }' -f id="$PROJECT_ID")
+              else
+                RESULT=$(gh api graphql -f query='
+                  query($id: ID!, $cursor: String!) {
+                    node(id: $id) {
+                      ... on ProjectV2 {
+                        items(first: 100, after: $cursor) {
+                          pageInfo { hasNextPage endCursor }
+                          nodes {
+                            id
+                            updatedAt
+                            fieldValueByName(name: "Status") {
+                              ... on ProjectV2ItemFieldSingleSelectValue { optionId }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }' -f id="$PROJECT_ID" -f cursor="$CURSOR")
+              fi
+
+              # jq: pick items whose Status = Done AND updatedAt < threshold
+              MAPFILE=$(echo "$RESULT" | jq -r --arg th "$THRESHOLD" --arg done_id "$DONE_ID" '
+                .data.node.items.nodes[]
+                | select(.fieldValueByName.optionId == $done_id)
+                | select((.updatedAt | fromdateiso8601) < ($th | tonumber))
+                | .id
+              ')
+
+              if [[ -n "$MAPFILE" ]]; then
+                while IFS= read -r ITEM_ID; do
+                  [[ -z "$ITEM_ID" ]] && continue
+                  if [[ "$DRY_RUN" == "true" ]]; then
+                    echo "  [DRY] would archive $ITEM_ID"
+                  else
+                    gh api graphql -f query='
+                      mutation($p: ID!, $i: ID!, $f: ID!, $v: String!) {
+                        updateProjectV2ItemFieldValue(input: {
+                          projectId: $p, itemId: $i, fieldId: $f,
+                          value: { singleSelectOptionId: $v }
+                        }) { projectV2Item { id } }
+                      }' -f p="$PROJECT_ID" -f i="$ITEM_ID" -f f="$FIELD_ID" -f v="$ARCHIVED_ID" > /dev/null
+                    echo "  ✓ archived $ITEM_ID"
+                  fi
+                  BOARD_COUNT=$((BOARD_COUNT + 1))
+                done <<< "$MAPFILE"
+              fi
+
+              HAS_NEXT=$(echo "$RESULT" | jq -r '.data.node.items.pageInfo.hasNextPage')
+              if [[ "$HAS_NEXT" != "true" ]]; then break; fi
+              CURSOR=$(echo "$RESULT" | jq -r '.data.node.items.pageInfo.endCursor')
+            done
+
+            echo "  → $BOARD_COUNT archived on board /$NUM"
+            TOTAL=$((TOTAL + BOARD_COUNT))
+            echo
+          done
+
+          echo "=== Total archived across 10 boards: $TOTAL ==="

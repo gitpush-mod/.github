@@ -1,0 +1,127 @@
+name: Append entry to CHANGELOG (reusable)
+
+# Reusable workflow. Called by per-repo on-issue-close workflows to append
+# a Keep-a-Changelog "Unreleased" entry when an issue is closed as completed.
+#
+# Caller must:
+#   - use `secrets: inherit` so MOD_PROJECT_TOKEN is available
+#   - pass the closed issue's number, title, closer, and state_reason
+#
+# The reusable workflow runs in the CALLER's repo context — `actions/checkout`
+# checks out the caller's repo, and commits are pushed to the caller's `main`.
+#
+# Security note: issue title is USER-CONTROLLED on public repos. It is passed
+# to Python via environment variable (never interpolated into the script body)
+# and never eval'd or executed as shell.
+
+on:
+  workflow_call:
+    inputs:
+      issue_number:
+        required: true
+        type: number
+      issue_title:
+        required: true
+        type: string
+      closed_by:
+        required: true
+        type: string
+      state_reason:
+        required: false
+        type: string
+        default: completed
+
+jobs:
+  append:
+    runs-on: ubuntu-latest
+    # Only append when the issue was closed as "completed" (not "not planned")
+    if: inputs.state_reason == 'completed'
+    permissions:
+      contents: write
+    steps:
+      - name: Check out caller repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.MOD_PROJECT_TOKEN }}
+
+      - name: Append to CHANGELOG.md
+        env:
+          ISSUE_NUM: ${{ inputs.issue_number }}
+          ISSUE_TITLE: ${{ inputs.issue_title }}
+          CLOSER: ${{ inputs.closed_by }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          python3 <<'PY'
+          import os, pathlib, re
+          from datetime import datetime, timezone
+
+          issue_num = os.environ["ISSUE_NUM"]
+          title = os.environ["ISSUE_TITLE"]
+          closer = os.environ["CLOSER"]
+          repo = os.environ["REPO"]
+
+          date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+          issue_url = f"https://github.com/{repo}/issues/{issue_num}"
+          # Minimal markdown escape for the title (leave the rest as-is)
+          safe = title.replace("[", "\\[").replace("]", "\\]")
+          entry = f"- {safe} ([#{issue_num}]({issue_url})) — closed {date} by @{closer}\n"
+
+          p = pathlib.Path("CHANGELOG.md")
+
+          # Bootstrap if missing
+          if not p.exists():
+              p.write_text(
+                  "# Changelog\n\n"
+                  "All notable changes to this project are documented here.\n"
+                  "Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).\n\n"
+                  "## [Unreleased]\n\n",
+                  encoding="utf-8",
+              )
+
+          txt = p.read_text(encoding="utf-8")
+
+          # Ensure [Unreleased] section exists — insert after first blank line following H1
+          if "## [Unreleased]" not in txt:
+              lines = txt.splitlines(keepends=True)
+              out, inserted, seen_h1 = [], False, False
+              for line in lines:
+                  out.append(line)
+                  if not inserted and seen_h1 and line.strip() == "":
+                      out.append("## [Unreleased]\n\n")
+                      inserted = True
+                  if line.startswith("# "):
+                      seen_h1 = True
+              if not inserted:
+                  out.append("\n## [Unreleased]\n\n")
+              txt = "".join(out)
+
+          # Insert entry immediately after the "## [Unreleased]" header
+          def add_entry(match):
+              return match.group(0).rstrip() + "\n" + entry
+
+          new, n = re.subn(
+              r"^## \[Unreleased\][^\n]*\n(?:\n)?",
+              add_entry,
+              txt,
+              count=1,
+              flags=re.M,
+          )
+          if n == 0:
+              raise SystemExit("Could not locate [Unreleased] header after bootstrap")
+
+          p.write_text(new, encoding="utf-8")
+          print(f"Appended entry for issue #{issue_num}")
+          PY
+
+          if git diff --quiet CHANGELOG.md; then
+            echo "CHANGELOG.md unchanged — nothing to commit"
+            exit 0
+          fi
+
+          git config user.name "gitpush-mod-bot"
+          git config user.email "actions@github.com"
+          git add CHANGELOG.md
+          git commit -m "CHANGELOG: entry for closed issue #${ISSUE_NUM}"
+          git push
