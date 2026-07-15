@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Steam Workshop discussion (Space Engineers mods)
+    url: https://steamcommunity.com/id/godimas/myworkshopfiles
+    about: For general questions and community discussion on SE mods, use the Steam Workshop comments on the mod itself.
+  - name: 🎮 Nexus Mods comments (MechWarrior 5 mods)
+    url: https://www.nexusmods.com/users/151048748
+    about: For general questions and community discussion on MW5 mods, use the Nexus Mods comments on the mod itself.
+  - name: 🧡 Patreon — project log
+    url: https://patreon.com/Godimas101
+    about: Follow the ongoing project log, behind-the-scenes updates, and roadmap chatter.
