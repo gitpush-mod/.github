@@ -12,8 +12,7 @@ Thanks for the interest — these mods are all built by [Godimas101](https://git
 4. Fill in what the template asks — the more specific, the better
 
 **Rate + comment on the mod** on its distribution page:
-- Space Engineers mods → [Steam Workshop](https://steamcommunity.com/id/godimas/myworkshopfiles)
-- MechWarrior 5 mods → [Nexus Mods](https://www.nexusmods.com/users/151048748)
+- Space Engineers + MechWarrior 5 mods → [Steam Workshop](https://steamcommunity.com/id/godimas/myworkshopfiles)
 
 **Support on Patreon** — [patreon.com/Godimas101](https://patreon.com/Godimas101). Not required, always appreciated.
 
