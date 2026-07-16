@@ -120,7 +120,11 @@ jobs:
           print(f"Appended entry for issue #{issue_num}")
           PY
 
-          if git diff --quiet CHANGELOG.md; then
+          # Use git status --porcelain so we catch untracked (first-run
+          # bootstrap) files. `git diff --quiet CHANGELOG.md` returns 0
+          # ("no diff") for an untracked file because git compares against
+          # the index, and untracked files have no index entry.
+          if [[ -z "$(git status --porcelain CHANGELOG.md)" ]]; then
             echo "CHANGELOG.md unchanged — nothing to commit"
             exit 0
           fi
