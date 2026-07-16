@@ -22,8 +22,8 @@ GitHub picks up files in a special `.github` repo as **org-wide defaults**. Any 
 
 - **This repo is small on purpose.** Do not add mod-specific content here — that belongs on the mod's own repo.
 - **Do not delete** `profile/README.md` — it's what renders the org landing page.
-- **Style guide:** [`Godimas101/personal-projects/docs/style-guides/README_STYLE_GUIDE.md`](https://github.com/Godimas101/personal-projects/blob/main/docs/style-guides/README_STYLE_GUIDE.md) — the `Org profile` family uses the `blur` capsule type.
-- **Repo family reference:** [`REPO_FAMILY.md`](https://github.com/Godimas101/personal-projects/blob/main/docs/style-guides/REPO_FAMILY.md) — canonical mapping of capsule types per repo.
+- **Style guide:** `personal-docs/style-guides/README_STYLE_GUIDE.md` (private companion repo) — the `Org profile` family uses the `blur` capsule type.
+- **Repo family reference:** `personal-docs/style-guides/REPO_FAMILY.md` (private companion repo) — canonical mapping of capsule types per repo.
 
 ## Where work lives (RULE — non-negotiable)
 
@@ -42,4 +42,4 @@ Changes to this repo are usually tracked on the **[Personal Projects board](http
 
 - Org landing page: <https://github.com/gitpush-mod>
 - Personal profile equivalent: [`Godimas101/Godimas101`](https://github.com/Godimas101/Godimas101) (the personal user profile)
-- Style guide: [`README_STYLE_GUIDE.md`](https://github.com/Godimas101/personal-projects/blob/main/docs/style-guides/README_STYLE_GUIDE.md)
+- Style guide: `personal-docs/style-guides/README_STYLE_GUIDE.md` (private repo)

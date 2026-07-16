@@ -16,9 +16,9 @@ Just push to `main`. GitHub picks up changes to `profile/README.md` on the org l
 
 ## Where the actual mods live
 
-Everything else. See the org page or the [`REPO_FAMILY.md`](https://github.com/Godimas101/personal-projects/blob/main/docs/style-guides/REPO_FAMILY.md) reference in `Godimas101/personal-projects` for the full list.
+Everything else. See the org page or the `personal-docs/style-guides/REPO_FAMILY.md` (private companion repo) reference in `Godimas101/personal-projects` for the full list.
 
 ## Related
 
 - **Personal profile equivalent:** [`Godimas101/Godimas101`](https://github.com/Godimas101/Godimas101)
-- **Style guide:** [`personal-projects/docs/style-guides/README_STYLE_GUIDE.md`](https://github.com/Godimas101/personal-projects/blob/main/docs/style-guides/README_STYLE_GUIDE.md)
+- **Style guide:** `personal-docs/style-guides/README_STYLE_GUIDE.md` (private companion repo)
