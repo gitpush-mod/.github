@@ -6,6 +6,7 @@
   <a href="https://steamcommunity.com/id/godimas/myworkshopfiles"><img src="https://img.shields.io/badge/Steam%20Workshop-SE%20%2B%20MW5-1B2838?style=for-the-badge&logo=steam&logoColor=white" alt="Steam Workshop" /></a>
   <a href="https://patreon.com/Godimas101"><img src="https://img.shields.io/badge/Patreon-Project%20log-FF424D?style=for-the-badge&logo=patreon&logoColor=white" alt="Patreon" /></a>
   <a href="https://thecanadian.space"><img src="https://img.shields.io/badge/The%20Canadian%20Space-space%20blog-0EA5E9?style=for-the-badge&logo=rocket&logoColor=white" alt="The Canadian Space" /></a>
+  <a href="https://godimas101.github.io/portfolio/"><img src="https://img.shields.io/badge/Chris's%20Portfolio-godimas101.github.io-C5B029?style=for-the-badge&logo=githubpages&logoColor=white" alt="Chris's Portfolio" /></a>
 </p>
 
 > **"Mods that solve the fiddly bits so you can get back to building weird stuff in space."**
