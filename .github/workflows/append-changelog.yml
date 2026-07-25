@@ -4,7 +4,11 @@ name: Append entry to CHANGELOG (reusable)
 # a Keep-a-Changelog "Unreleased" entry when an issue is closed as completed.
 #
 # Caller must:
-#   - use `secrets: inherit` so MOD_PROJECT_TOKEN is available
+#   - grant `permissions: contents: write` (a called workflow can't escalate
+#     above the caller, so without this the caller inherits the repo's
+#     read-only default and the call fails at startup)
+#   - use `secrets: inherit` so MOD_PROJECT_TOKEN is available (optional —
+#     falls back to GITHUB_TOKEN for repos without it, e.g. Godimas101 repos)
 #   - pass the closed issue's number, title, closer, and state_reason
 #
 # The reusable workflow runs in the CALLER's repo context — `actions/checkout`
@@ -58,14 +62,16 @@ jobs:
         run: |
           set -euo pipefail
 
-          python3 <<'PY'
+          # The append logic lives in a file so the retry loop below can re-run
+          # it against the latest CHANGELOG after a concurrent push.
+          cat > "$RUNNER_TEMP/append_changelog.py" <<'PY'
           import os, pathlib, re
           from datetime import datetime, timezone
 
           issue_num = os.environ["ISSUE_NUM"]
-          title = os.environ["ISSUE_TITLE"]
+          title  = os.environ["ISSUE_TITLE"]
           closer = os.environ["CLOSER"]
-          repo = os.environ["REPO"]
+          repo   = os.environ["REPO"]
 
           date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
           issue_url = f"https://github.com/{repo}/issues/{issue_num}"
@@ -74,8 +80,6 @@ jobs:
           entry = f"- {safe} ([#{issue_num}]({issue_url})) — closed {date} by @{closer}\n"
 
           p = pathlib.Path("CHANGELOG.md")
-
-          # Bootstrap if missing
           if not p.exists():
               p.write_text(
                   "# Changelog\n\n"
@@ -87,50 +91,77 @@ jobs:
 
           txt = p.read_text(encoding="utf-8")
 
-          # Ensure [Unreleased] section exists — insert after first blank line following H1
+          # Idempotent: don't double-add on a retry whose entry already landed.
+          if entry.strip() in txt:
+              print(f"Entry for #{issue_num} already present — nothing to do")
+              raise SystemExit(0)
+
+          # Ensure an [Unreleased] section exists. Insert it just before the first
+          # release section ("## [1.2.0]" / "## [2026-07-25]" ...) so it lands
+          # after any intro paragraph, not jammed under the "# Changelog" title.
           if "## [Unreleased]" not in txt:
-              lines = txt.splitlines(keepends=True)
-              out, inserted, seen_h1 = [], False, False
-              for line in lines:
-                  out.append(line)
-                  if not inserted and seen_h1 and line.strip() == "":
-                      out.append("## [Unreleased]\n\n")
-                      inserted = True
-                  if line.startswith("# "):
-                      seen_h1 = True
-              if not inserted:
-                  out.append("\n## [Unreleased]\n\n")
-              txt = "".join(out)
+              m = re.search(r"^## \[", txt, flags=re.M)
+              if m:
+                  txt = txt[:m.start()] + "## [Unreleased]\n\n" + txt[m.start():]
+              else:
+                  if not txt.endswith("\n"):
+                      txt += "\n"
+                  txt += "\n## [Unreleased]\n\n"
 
-          # Insert entry immediately after the "## [Unreleased]" header
-          def add_entry(match):
-              return match.group(0).rstrip() + "\n" + entry
-
-          new, n = re.subn(
-              r"^## \[Unreleased\][^\n]*\n(?:\n)?",
-              add_entry,
-              txt,
-              count=1,
-              flags=re.M,
-          )
-          if n == 0:
+          # Insert the entry under the [Unreleased] header (newest first), keeping
+          # a blank line before the following section.
+          lines = txt.splitlines(keepends=True)
+          for i, line in enumerate(lines):
+              if line.startswith("## [Unreleased]"):
+                  j = i + 1
+                  if j < len(lines) and lines[j].strip() == "":
+                      j += 1                        # keep the blank after the header
+                  else:
+                      lines.insert(j, "\n"); j += 1
+                  if j < len(lines) and lines[j].lstrip().startswith("- "):
+                      lines.insert(j, entry)        # existing entries: tight list
+                  else:
+                      lines.insert(j, entry)        # empty section: entry + blank
+                      lines.insert(j + 1, "\n")
+                  break
+          else:
               raise SystemExit("Could not locate [Unreleased] header after bootstrap")
 
-          p.write_text(new, encoding="utf-8")
+          p.write_text("".join(lines), encoding="utf-8")
           print(f"Appended entry for issue #{issue_num}")
           PY
 
-          # Use git status --porcelain so we catch untracked (first-run
-          # bootstrap) files. `git diff --quiet CHANGELOG.md` returns 0
-          # ("no diff") for an untracked file because git compares against
-          # the index, and untracked files have no index entry.
-          if [[ -z "$(git status --porcelain CHANGELOG.md)" ]]; then
-            echo "CHANGELOG.md unchanged — nothing to commit"
-            exit 0
-          fi
-
           git config user.name "gitpush-mod-bot"
           git config user.email "actions@github.com"
-          git add CHANGELOG.md
-          git commit -m "CHANGELOG: entry for closed issue #${ISSUE_NUM}"
-          git push
+          branch="$(git rev-parse --abbrev-ref HEAD)"
+
+          # Append + push, retrying on a concurrent update: when several issues
+          # are closed at once their runs push near-simultaneously; the loser of
+          # a push race re-syncs and re-appends onto the winner's update instead
+          # of failing.
+          for attempt in 1 2 3 4 5; do
+            python3 "$RUNNER_TEMP/append_changelog.py"
+
+            # git status --porcelain also catches the untracked first-run bootstrap
+            # (git diff --quiet would report "no diff" for an untracked file).
+            if [[ -z "$(git status --porcelain CHANGELOG.md)" ]]; then
+              echo "CHANGELOG.md unchanged — nothing to commit"
+              exit 0
+            fi
+
+            git add CHANGELOG.md
+            git commit -q -m "CHANGELOG: entry for closed issue #${ISSUE_NUM}"
+
+            if git push; then
+              echo "Pushed on attempt ${attempt}"
+              exit 0
+            fi
+
+            echo "Push attempt ${attempt} rejected (concurrent update) — re-syncing and retrying..."
+            git fetch -q origin "$branch"
+            git reset -q --hard "origin/${branch}"
+            sleep $(( attempt * 2 ))
+          done
+
+          echo "::error::Could not push CHANGELOG update after 5 attempts"
+          exit 1
