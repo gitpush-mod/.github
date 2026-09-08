@@ -2,7 +2,7 @@
 name: Bug report
 about: Report a bug or crash in a gitpush-mod mod
 title: "[BUG] "
-labels: bug, fromSteam
+labels: bug
 assignees: Godimas101
 ---
 
