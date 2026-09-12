@@ -21,7 +21,7 @@ on:
   workflow_call:
     inputs:
       scripts_path:
-        description: Path within the calling repo to scan (default: whole repo)
+        description: 'Path within the calling repo to scan; defaults to the whole repo'
         required: false
         type: string
         default: '.'
