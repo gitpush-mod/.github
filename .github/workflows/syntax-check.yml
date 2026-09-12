@@ -1,0 +1,57 @@
+# Reusable syntax check for Space Engineers mod scripts.
+#
+# Why this exists: SE compiles a mod's Data/Scripts into a SINGLE assembly at world
+# load, so one syntax error fails the whole mod rather than just the bad file. The
+# se-infolcd-apex-advanced repo sat in a non-building state for ~9 months without
+# anyone noticing (see that repo's issue #2, 76 errors).
+#
+# Scope, and its limit: Keen's Bin64 assemblies are proprietary and absent from GitHub
+# runners, so a full semantic build cannot run here. This check parses syntax only --
+# no reference resolution, so no missing-type noise. It catches the corruption class
+# (escaped quotes, truncated files, stray characters). It does NOT catch semantic
+# errors such as an undeclared field; those need the SE assemblies and are covered by
+# each repo's local tools/build-check.ps1 instead.
+#
+# Parsed as C# 6 deliberately -- that is what SE's in-game compiler accepts, so newer
+# syntax fails here rather than for players at load.
+
+name: Syntax check
+
+on:
+  workflow_call:
+    inputs:
+      scripts_path:
+        description: Path within the calling repo to scan (default: whole repo)
+        required: false
+        type: string
+        default: '.'
+
+permissions:
+  contents: read
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out calling repo
+        uses: actions/checkout@v4
+        with:
+          path: repo
+
+      - name: Check out shared tooling
+        uses: actions/checkout@v4
+        with:
+          repository: gitpush-mod/.github
+          path: tooling
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Parse mod scripts
+        run: |
+          set -euo pipefail
+          TARGET="$GITHUB_WORKSPACE/repo/${{ inputs.scripts_path }}"
+          echo "Scanning: $TARGET"
+          dotnet run --project tooling/tools/SyntaxCheck/SyntaxCheck.csproj -c Release -- "$TARGET"
