@@ -1,4 +1,4 @@
-// Space Engineers mod script syntax checker.
+﻿// Space Engineers mod script syntax checker.
 //
 // SE compiles a mod's Data/Scripts into a SINGLE assembly at load time, so one syntax
 // error fails the entire mod, not just the offending file. This catches that class of
@@ -69,17 +69,21 @@ internal static class Program
         return 1;
     }
 
+    // (char)92 rather than a backslash literal: this file has been mangled by a heredoc
+    // twice, and an escaped backslash is exactly the corruption this tool exists to catch.
+    private const char Backslash = (char)92;
+
     private static bool IsIgnored(string path, string root)
     {
-        var p = path.Replace('\', '/');
+        var p = path.Replace(Backslash, '/');
         return p.Contains("/obj/") || p.Contains("/bin/") || p.Contains("/.git/")
                || p.Contains("/.vs/") || p.EndsWith(".Designer.cs", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string Rel(string path, string root)
     {
-        var p = path.Replace('\', '/');
-        var r = root.Replace('\', '/').TrimEnd('/') + "/";
+        var p = path.Replace(Backslash, '/');
+        var r = root.Replace(Backslash, '/').TrimEnd('/') + "/";
         return p.StartsWith(r, StringComparison.OrdinalIgnoreCase) ? p.Substring(r.Length) : p;
     }
 }
