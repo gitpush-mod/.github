@@ -26,14 +26,14 @@ jobs:
       ORG: gitpush-mod
       DAYS_OLD: ${{ inputs.days_old || '30' }}
       DRY_RUN: ${{ inputs.dry_run || 'false' }}
-      GH_TOKEN: ${{ secrets.MOD_PROJECT_TOKEN }}
+      GH_TOKEN: ${{ secrets.PAT_MOD_PROJECT }}
     steps:
       - name: Archive Done items older than ${{ inputs.days_old || '30' }} days
         run: |
           set -euo pipefail
 
           if [[ -z "${GH_TOKEN:-}" ]]; then
-            echo "::error::MOD_PROJECT_TOKEN secret is not set on this repo/org."
+            echo "::error::PAT_MOD_PROJECT secret is not set on this repo/org."
             exit 1
           fi
 
