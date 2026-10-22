@@ -153,4 +153,4 @@ jobs:
             echo
           done
 
-          echo "=== Total archived across 10 boards: $TOTAL ==="
+          echo "=== Total archived across $(wc -w <<< "$BOARDS") boards: $TOTAL ==="
