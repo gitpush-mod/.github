@@ -19,6 +19,7 @@ Home for Chris Carpenter's ([Godimas101](https://github.com/Godimas101)) publish
 |---|---|
 | [**InfoLCD — Apex Update**](https://github.com/gitpush-mod/se-infolcd-apex-update) | Flagship. Adds real-time info displays to Apex LCD blocks. Client-side only. 1,335+ subscribers. |
 | [**InfoLCD — Apex Advanced**](https://github.com/gitpush-mod/se-infolcd-apex-advanced) | Sibling variant of InfoLCD with expanded readouts. |
+| [**InfoLCD — Apex Server**](https://github.com/gitpush-mod/se-infolcd-apex-server) | Server-side edition of InfoLCD, so console players on crossplay servers get the apps too. Open alpha; test builds go to mod.io. |
 | [**Not Just For Looks**](https://github.com/gitpush-mod/se-not-just-for-looks) | Upgrades Keen DLC reskins with real gameplay functionality. |
 | [**NJFL — Additions**](https://github.com/gitpush-mod/se-not-just-for-looks-additions) | Extension pack for Not Just For Looks. |
 | [**NJFL — Without Weapons**](https://github.com/gitpush-mod/se-not-just-for-looks-without-weapons) | NJFL variant with weapon blocks removed. |

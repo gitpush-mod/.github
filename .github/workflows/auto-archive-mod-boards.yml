@@ -37,7 +37,7 @@ jobs:
             exit 1
           fi
 
-          BOARDS="3 4 5 6 7 8 9 10 11 12"
+          BOARDS="3 4 5 6 7 8 9 10 11 12 13"
           TOTAL=0
           THRESHOLD=$(date -u -d "$DAYS_OLD days ago" +%s)
           echo "Threshold: $DAYS_OLD days → cutoff $(date -u -d "@$THRESHOLD" '+%Y-%m-%d %H:%M UTC')"
